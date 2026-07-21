@@ -1,0 +1,46 @@
+.settings-layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.settings-links {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-links h2 {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.settings-links > div {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 28px 1fr;
+  min-height: 57px;
+}
+
+.settings-links > div svg {
+  color: var(--green);
+}
+
+.settings-links strong,
+.settings-links small {
+  display: block;
+}
+
+.settings-links strong {
+  font-size: 11px;
+}
+
+.settings-links small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+}

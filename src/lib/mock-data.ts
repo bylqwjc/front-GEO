@@ -1,0 +1,223 @@
+import type {
+  ActionTask,
+  CitationOpportunity,
+  PromptResult,
+  VoiceShare,
+} from "@/lib/types";
+
+export const voiceShare: VoiceShare[] = [
+  { brand: "Acme Cloud", value: 31, color: "var(--green)" },
+  { brand: "Notion", value: 29, color: "var(--blue)" },
+  { brand: "Confluence", value: 24, color: "var(--amber)" },
+  { brand: "Slite", value: 16, color: "var(--coral)" },
+];
+
+export const journeyStages = [
+  { stage: "问题认知", mention: 71, recommendation: 44, prompts: 5 },
+  { stage: "方案发现", mention: 63, recommendation: 38, prompts: 5 },
+  { stage: "产品比较", mention: 48, recommendation: 31, prompts: 6 },
+  { stage: "购买决策", mention: 29, recommendation: 18, prompts: 4 },
+];
+
+export const recentAudits = [
+  {
+    id: "audit-2026-0719",
+    name: "美国市场 · 核心品类",
+    prompts: 20,
+    engines: 3,
+    status: "completed",
+    score: "31%",
+    date: "今天 10:32",
+  },
+  {
+    id: "audit-2026-0712",
+    name: "美国市场 · 竞品比较",
+    prompts: 16,
+    engines: 3,
+    status: "completed",
+    score: "27%",
+    date: "7月12日",
+  },
+  {
+    id: "audit-2026-0705",
+    name: "英国市场 · SaaS 团队",
+    prompts: 12,
+    engines: 2,
+    status: "completed",
+    score: "24%",
+    date: "7月5日",
+  },
+];
+
+export const promptResults: PromptResult[] = [
+  {
+    id: "p1",
+    engine: "chatgpt",
+    prompt: "What are the best knowledge base tools for remote SaaS teams?",
+    mentioned: true,
+    recommended: true,
+    position: 3,
+    citation: "g2.com",
+    summary: "被列入远程团队候选方案，但缺少权限管理能力描述。",
+  },
+  {
+    id: "p2",
+    engine: "perplexity",
+    prompt: "Best Notion alternatives for managing company knowledge",
+    mentioned: true,
+    recommended: false,
+    position: 5,
+    citation: "capterra.com",
+    summary: "作为替代方案出现，但回答更推荐 Slite 与 Confluence。",
+  },
+  {
+    id: "p3",
+    engine: "gemini",
+    prompt: "Acme Cloud vs Confluence for a 100-person startup",
+    mentioned: true,
+    recommended: true,
+    position: 2,
+    citation: "acmecloud.example",
+    summary: "认可上手速度，但错误描述了企业版的 SSO 范围。",
+  },
+  {
+    id: "p4",
+    engine: "chatgpt",
+    prompt: "Which knowledge base has the best AI search?",
+    mentioned: false,
+    recommended: false,
+    position: null,
+    citation: null,
+    summary: "回答主要引用 Notion、Guru 和 Glean，品牌未出现。",
+  },
+  {
+    id: "p5",
+    engine: "perplexity",
+    prompt: "Secure internal wiki for SOC 2 compliant companies",
+    mentioned: true,
+    recommended: true,
+    position: 4,
+    citation: "softwareadvice.com",
+    summary: "安全能力获得认可，引用来自第三方软件目录。",
+  },
+  {
+    id: "p6",
+    engine: "gemini",
+    prompt: "Affordable Confluence alternative for small teams",
+    mentioned: false,
+    recommended: false,
+    position: null,
+    citation: null,
+    summary: "缺少可被检索的公开价格对比信息。",
+  },
+  {
+    id: "p7",
+    engine: "chatgpt",
+    prompt: "Knowledge base software with Slack integration",
+    mentioned: true,
+    recommended: false,
+    position: 6,
+    citation: "zapier.com",
+    summary: "被引用但位置较低，竞品拥有更完整的集成说明。",
+  },
+  {
+    id: "p8",
+    engine: "perplexity",
+    prompt: "Is Acme Cloud suitable for distributed product teams?",
+    mentioned: true,
+    recommended: true,
+    position: 1,
+    citation: "acmecloud.example",
+    summary: "回答准确引用了远程协作和异步评审能力。",
+  },
+];
+
+export const citationOpportunities: CitationOpportunity[] = [
+  {
+    domain: "zapier.com",
+    category: "工作流与集成",
+    competitorCitations: 18,
+    brandCitations: 2,
+    authority: "高",
+  },
+  {
+    domain: "g2.com",
+    category: "软件评价",
+    competitorCitations: 15,
+    brandCitations: 6,
+    authority: "高",
+  },
+  {
+    domain: "remote.tools",
+    category: "远程协作",
+    competitorCitations: 11,
+    brandCitations: 0,
+    authority: "中",
+  },
+  {
+    domain: "saasframe.io",
+    category: "SaaS 案例",
+    competitorCitations: 8,
+    brandCitations: 1,
+    authority: "中",
+  },
+];
+
+export const actionTasks: ActionTask[] = [
+  {
+    id: "t1",
+    title: "发布 Acme Cloud 与 Confluence 的 100 人团队对比页",
+    evidence: "6 个比较型 Prompt 中，Confluence 的推荐率高出 37%。",
+    impact: "高",
+    status: "doing",
+    owner: "内容团队",
+    due: "7月23日",
+    category: "内容缺口",
+  },
+  {
+    id: "t2",
+    title: "补充企业版 SSO 与 SOC 2 的事实说明",
+    evidence: "Gemini 在 2 次回答中错误描述了 SSO 的套餐限制。",
+    impact: "高",
+    status: "todo",
+    owner: "产品市场",
+    due: "7月24日",
+    category: "品牌事实",
+  },
+  {
+    id: "t3",
+    title: "更新 Zapier 集成目录中的产品资料",
+    evidence: "zapier.com 被竞品引用 18 次，品牌仅被引用 2 次。",
+    impact: "高",
+    status: "todo",
+    owner: "增长团队",
+    due: "7月26日",
+    category: "外部信源",
+  },
+  {
+    id: "t4",
+    title: "在价格页增加小团队成本计算示例",
+    evidence: "价格敏感型 Prompt 中品牌提及率只有 20%。",
+    impact: "中",
+    status: "todo",
+    owner: "网站团队",
+    due: "7月28日",
+    category: "页面优化",
+  },
+  {
+    id: "t5",
+    title: "重写 Slack 集成页的功能摘要",
+    evidence: "AI 回答能找到页面，但无法提取具体的自动化能力。",
+    impact: "中",
+    status: "done",
+    owner: "内容团队",
+    due: "7月18日",
+    category: "页面优化",
+  },
+];
+
+export const engineLabels = {
+  chatgpt: "ChatGPT Search",
+  perplexity: "Perplexity",
+  gemini: "Gemini",
+} as const;
