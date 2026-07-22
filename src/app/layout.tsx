@@ -1,11 +1,10 @@
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { AppFrame } from "@/components/app-frame"
 import { Toaster } from "@/components/ui/sonner"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { AuthProvider } from "@/lib/auth"
 import { LanguageProvider } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
@@ -23,22 +22,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN" className={cn("font-sans", geist.variable)} suppressHydrationWarning>
       <body>
         <LanguageProvider>
-          <TooltipProvider>
-            <SidebarProvider
-              style={
-                {
-                  "--sidebar-width": "calc(var(--spacing) * 64)",
-                  "--header-height": "calc(var(--spacing) * 12)",
-                } as React.CSSProperties
-              }
-            >
-              <AppSidebar variant="inset" />
-              <SidebarInset>
-                <SiteHeader />
-                <main className="flex min-h-0 flex-1 flex-col">{children}</main>
-              </SidebarInset>
-            </SidebarProvider>
-          </TooltipProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <AppFrame>{children}</AppFrame>
+            </TooltipProvider>
+          </AuthProvider>
           <Toaster />
         </LanguageProvider>
       </body>

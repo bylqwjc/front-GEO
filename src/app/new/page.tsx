@@ -57,7 +57,7 @@ export default function NewAuditPage() {
     setSubmitting(true)
     setError("")
     try {
-      const response = await fetch(`${apiUrl}/audits`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand, domain, description, competitors, prompts, engines: selectedEngines }) })
+      const response = await fetch(`${apiUrl}/audits`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand, domain, description, competitors, prompts, engines: selectedEngines }) })
       const result = (await response.json()) as { id?: string; error?: string }
       if (!response.ok || !result.id) throw new Error(result.error ?? "创建检测失败，请稍后重试。")
       router.push(`/audit/${result.id}`)

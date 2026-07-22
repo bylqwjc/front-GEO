@@ -51,7 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
         <SidebarGroup className="mt-auto"><SidebarMenu><SidebarMenuItem><SidebarMenuButton tooltip={t("帮助中心")}><CircleHelpIcon /><span>{t("帮助中心")}</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarGroup>
       </SidebarContent>
-      <SidebarFooter><NavUser user={{ name: "林启明", email: "Acme Cloud" }} /></SidebarFooter>
+      <SidebarFooter><NavUser /></SidebarFooter>
     </Sidebar>
   )
 }

@@ -30,3 +30,8 @@ pnpm dev
 4. 增加邮箱登录、额度限制、付费和通知。
 
 环境变量模板见 `.env.example`。
+
+## 登录与注册
+
+前端通过 `NEXT_PUBLIC_API_URL` 调用独立后端，使用 HttpOnly Cookie 保持登录状态。
+登录页为 `/login`，注册页为 `/register`。
