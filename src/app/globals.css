@@ -11,8 +11,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #3641f5;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -22,7 +22,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #3641f5;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -31,15 +31,44 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-primary: #3641f5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: color-mix(in srgb, #3641f5 9%, white);
+  --sidebar-accent-foreground: #3641f5;
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: #3641f5;
 }
 
 @theme inline {
+  /* Keep neutral grays intact; remap color accents to the brand palette. */
+  --color-blue-50: color-mix(in srgb, #3641f5 6%, white);
+  --color-blue-200: color-mix(in srgb, #3641f5 24%, white);
+  --color-blue-600: #3641f5;
+  --color-blue-700: #3641f5;
+  --color-blue-900: #3641f5;
+  --color-emerald-50: color-mix(in srgb, #3641f5 6%, white);
+  --color-emerald-100: color-mix(in srgb, #3641f5 12%, white);
+  --color-emerald-200: color-mix(in srgb, #3641f5 24%, white);
+  --color-emerald-500: #3641f5;
+  --color-emerald-600: #3641f5;
+  --color-emerald-700: #3641f5;
+  --color-emerald-800: #3641f5;
+  --color-emerald-900: #3641f5;
+  --color-green-400: #3641f5;
+  --color-green-500: #3641f5;
+  --color-amber-50: color-mix(in srgb, #e32636 6%, white);
+  --color-amber-100: color-mix(in srgb, #e32636 12%, white);
+  --color-amber-200: color-mix(in srgb, #e32636 24%, white);
+  --color-amber-300: color-mix(in srgb, #e32636 34%, white);
+  --color-amber-500: #e32636;
+  --color-amber-700: #e32636;
+  --color-amber-800: #e32636;
+  --color-amber-900: #e32636;
+  --color-amber-950: #e32636;
+  --color-rose-50: color-mix(in srgb, #e32636 6%, white);
+  --color-rose-200: color-mix(in srgb, #e32636 24%, white);
+  --color-rose-500: #e32636;
+  --color-rose-700: #e32636;
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -127,5 +156,24 @@
 
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  [data-slot="sidebar-content"] [data-sidebar="group"] {
+    padding-inline: 0.75rem;
+  }
+
+  [data-slot="sidebar-content"] [data-sidebar="menu-item"] {
+    margin-bottom: 0.375rem;
+  }
+
+  [data-slot="sidebar-content"] [data-sidebar="menu-item"]:last-child {
+    margin-bottom: 0;
+  }
+
+  [data-slot="sidebar-content"] [data-sidebar="menu-button"] {
+    min-height: 2.5rem;
+    padding-inline: 0.625rem;
   }
 }

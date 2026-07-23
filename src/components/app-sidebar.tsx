@@ -1,8 +1,9 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ActivityIcon, BarChart3Icon, CircleHelpIcon, FileSearchIcon, GaugeIcon, LibraryBigIcon, ListChecksIcon, PlusIcon, Settings2Icon, SparklesIcon } from "lucide-react"
+import { ActivityIcon, BarChart3Icon, CircleHelpIcon, FileSearchIcon, GaugeIcon, LibraryBigIcon, ListChecksIcon, PlusIcon, Settings2Icon } from "lucide-react"
 
 import { NavUser } from "@/components/nav-user"
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
@@ -33,8 +34,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
-        <SidebarMenu><SidebarMenuItem><SidebarMenuButton className="data-[slot=sidebar-menu-button]:p-1.5!" render={<Link href="/" />}><span className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background"><SparklesIcon className="size-4!" /></span><span className="text-base font-semibold">GEO Pulse</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
+      <SidebarHeader className="p-1">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton className="h-12 data-[slot=sidebar-menu-button]:px-1!" render={<Link href="/" aria-label="SEEN home" />}>
+              <Image
+                src="/kejian-seen-logo-web.png"
+                alt="SEEN"
+                width={1911}
+                height={396}
+                priority
+                className="h-auto w-[176px]"
+              />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
