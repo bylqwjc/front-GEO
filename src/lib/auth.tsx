@@ -1,15 +1,20 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
+import { z } from "zod"
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api"
+import { apiRequest } from "@/lib/api-client"
 
-export type AuthUser = {
-  id: string
-  name: string
-  email: string
-  createdAt: string
-}
+const authUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  createdAt: z.string(),
+})
+
+const authResponseSchema = z.object({ user: authUserSchema })
+
+export type AuthUser = z.infer<typeof authUserSchema>
 
 type AuthContextValue = {
   user: AuthUser | null
@@ -22,29 +27,13 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  })
-  const payload = (await response.json().catch(() => null)) as ({ error?: string } & T) | null
-  if (!response.ok) {
-    throw new Error(payload?.error ?? "请求失败，请稍后重试。")
-  }
-  return payload as T
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     try {
-      const result = await apiRequest<{ user: AuthUser }>("/auth/me")
+      const result = await apiRequest("/auth/me", {}, authResponseSchema)
       setUser(result.user)
     } catch {
       setUser(null)
@@ -54,30 +43,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    const timer = window.setTimeout(() => void refresh(), 0)
+    return () => window.clearTimeout(timer)
   }, [refresh])
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await apiRequest<{ user: AuthUser }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    })
+    const result = await apiRequest(
+      "/auth/login",
+      { method: "POST", body: JSON.stringify({ email, password }) },
+      authResponseSchema,
+    )
     setUser(result.user)
     return result.user
   }, [])
 
-  const register = useCallback(async (email: string, password: string, confirmPassword: string) => {
-    const result = await apiRequest<{ user: AuthUser }>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password, confirmPassword }),
-    })
-    setUser(result.user)
-    return result.user
-  }, [])
+  const register = useCallback(
+    async (email: string, password: string, confirmPassword: string) => {
+      const result = await apiRequest(
+        "/auth/register",
+        {
+          method: "POST",
+          body: JSON.stringify({ email, password, confirmPassword }),
+        },
+        authResponseSchema,
+      )
+      setUser(result.user)
+      return result.user
+    },
+    [],
+  )
 
   const logout = useCallback(async () => {
     try {
-      await apiRequest<{ success: boolean }>("/auth/logout", { method: "POST" })
+      await apiRequest<void>("/auth/logout", { method: "POST" })
     } finally {
       setUser(null)
     }

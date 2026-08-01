@@ -45,7 +45,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset>
+      <SidebarInset className="overflow-hidden">
         <SiteHeader />
         <main className="flex min-h-0 flex-1 flex-col">{children}</main>
       </SidebarInset>

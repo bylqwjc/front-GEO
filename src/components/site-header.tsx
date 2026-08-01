@@ -10,6 +10,8 @@ import { useLanguage, type Locale } from "@/lib/i18n"
 const titles: Record<string, string> = {
   "/": "AI 可见度概览",
   "/dashboard": "AI 可见度概览",
+  "/projects": "产品项目",
+  "/billing": "套餐与额度",
   "/new": "新建检测",
   "/audit": "检测任务",
   "/report": "可见度报告",

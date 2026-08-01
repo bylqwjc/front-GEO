@@ -6,6 +6,7 @@ import { ArrowDownRightIcon, ArrowUpRightIcon, MinusIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { useLanguage } from "@/lib/i18n"
+import type { EngineId } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export function GeoPageHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description: string; actions?: ReactNode }) {
@@ -32,7 +33,15 @@ export function GeoStatusBadge({ status }: { status: "completed" | "running" | "
   return <Badge variant="outline" className={config.className}>{t(config.label)}</Badge>
 }
 
-export function EngineMark({ engine, className }: { engine: "chatgpt" | "perplexity" | "gemini"; className?: string }) {
-  const config = { chatgpt: { label: "C", className: "bg-emerald-50 text-emerald-700" }, perplexity: { label: "P", className: "bg-blue-50 text-blue-700" }, gemini: { label: "G", className: "bg-amber-50 text-amber-700" } }[engine]
-  return <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold", config.className, className)}>{config.label}</span>
+export function EngineMark({ engine, className }: { engine: EngineId; className?: string }) {
+  const config: Record<EngineId, { label: string; className: string }> = {
+    chatgpt: { label: "C", className: "bg-emerald-50 text-emerald-700" },
+    perplexity: { label: "P", className: "bg-blue-50 text-blue-700" },
+    gemini: { label: "G", className: "bg-amber-50 text-amber-700" },
+    deepseek: { label: "D", className: "bg-cyan-50 text-cyan-700" },
+    doubao: { label: "豆", className: "bg-rose-50 text-rose-700" },
+    yuanbao: { label: "元", className: "bg-teal-50 text-teal-700" },
+  }
+  const mark = config[engine]
+  return <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold", mark.className, className)}>{mark.label}</span>
 }

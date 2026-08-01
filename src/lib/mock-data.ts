@@ -220,4 +220,7 @@ export const engineLabels = {
   chatgpt: "ChatGPT Search",
   perplexity: "Perplexity",
   gemini: "Gemini",
+  deepseek: "DeepSeek",
+  doubao: "豆包",
+  yuanbao: "腾讯元宝",
 } as const;
