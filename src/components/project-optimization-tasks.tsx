@@ -9,10 +9,12 @@ import {
   ClipboardIcon,
   ExternalLinkIcon,
   FileTextIcon,
+  InfoIcon,
   Link2Icon,
   ListChecksIcon,
   LoaderCircleIcon,
   RadarIcon,
+  RefreshCwIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -22,7 +24,22 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  generateOptimizationTasks,
   getProject,
+  listProjectAudits,
   listOptimizationTasks,
   submitOptimizationTaskVerification,
   updateOptimizationTask,
@@ -31,6 +48,14 @@ import {
 } from "@/lib/project-api"
 
 type Filter = "all" | "open" | "verify" | "done"
+type PlatformIssueCategory = "missing" | "weak" | "risk"
+
+type PlatformIssue = {
+  key: string
+  label: string
+  category: PlatformIssueCategory
+  quote: string
+}
 
 const statusMeta: Record<
   OptimizationTask["status"],
@@ -110,6 +135,70 @@ const verificationMeta: Record<
   },
 }
 
+const platformIssueMeta: Record<
+  PlatformIssueCategory,
+  { label: string; className: string }
+> = {
+  missing: {
+    label: "\u672a\u63d0\u53ca\u54c1\u724c",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
+  },
+  weak: {
+    label: "\u5df2\u63d0\u53ca\u4f46\u672a\u63a8\u8350",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  risk: {
+    label: "\u5b58\u5728\u4e8b\u5b9e\u98ce\u9669",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
+  },
+}
+
+function platformIssueCategory(value: unknown): PlatformIssueCategory | null {
+  return value === "missing" || value === "weak" || value === "risk"
+    ? value
+    : null
+}
+
+function shortEvidence(value: string) {
+  const compact = value.replace(/\s+/g, " ").trim()
+  return compact.length > 180 ? compact.slice(0, 180) + "..." : compact
+}
+
+function taskPlatformIssues(task: OptimizationTask) {
+  const issues = new Map<string, PlatformIssue>()
+
+  for (const evidence of task.evidence) {
+    if (
+      !evidence.metadata ||
+      typeof evidence.metadata !== "object" ||
+      Array.isArray(evidence.metadata)
+    ) {
+      continue
+    }
+    const metadata = evidence.metadata as Record<string, unknown>
+    const category = platformIssueCategory(metadata.category)
+    const engine = typeof metadata.engine === "string" ? metadata.engine : ""
+    const platformProduct =
+      typeof metadata.platformProduct === "string"
+        ? metadata.platformProduct
+        : ""
+    const label =
+      platformProduct ||
+      ({ DEEPSEEK: "DeepSeek", DOUBAO: "\u8c46\u5305" }[engine] ?? engine)
+    if (!category || !label) continue
+
+    const key = engine || label
+    issues.set(key, {
+      key,
+      label,
+      category,
+      quote: shortEvidence(evidence.quote ?? ""),
+    })
+  }
+
+  return [...issues.values()]
+}
+
 function stringList(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
@@ -172,6 +261,7 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<OptimizationTask[]>([])
   const [filter, setFilter] = useState<Filter>("all")
+  const [modelFilter, setModelFilter] = useState("all")
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [urlDrafts, setUrlDrafts] = useState<Record<string, string>>({})
@@ -205,15 +295,43 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const visibleTasks = useMemo(
-    () => tasks.filter((task) => filterTask(task, filter)),
-    [filter, tasks],
+  const modelOptions = useMemo(() => {
+    const models = new Map<
+      string,
+      { key: string; label: string; count: number }
+    >()
+    for (const task of tasks) {
+      for (const issue of taskPlatformIssues(task)) {
+        const current = models.get(issue.key)
+        models.set(issue.key, {
+          key: issue.key,
+          label: issue.label,
+          count: (current?.count ?? 0) + 1,
+        })
+      }
+    }
+    return [...models.values()]
+  }, [tasks])
+  const modelTasks = useMemo(
+    () =>
+      modelFilter === "all"
+        ? tasks
+        : tasks.filter((task) =>
+            taskPlatformIssues(task).some(
+              (issue) => issue.key === modelFilter,
+            ),
+          ),
+    [modelFilter, tasks],
   )
-  const openCount = tasks.filter((task) => isOpen(task.status)).length
-  const verifyCount = tasks.filter(
+  const visibleTasks = useMemo(
+    () => modelTasks.filter((task) => filterTask(task, filter)),
+    [filter, modelTasks],
+  )
+  const openCount = modelTasks.filter((task) => isOpen(task.status)).length
+  const verifyCount = modelTasks.filter(
     (task) => task.status === "READY_TO_VERIFY",
   ).length
-  const doneCount = tasks.filter((task) =>
+  const doneCount = modelTasks.filter((task) =>
     ["VERIFIED", "DISMISSED"].includes(task.status),
   ).length
 
@@ -227,6 +345,55 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
       }
       return next
     })
+  }
+
+  async function handleSyncLatestAudit() {
+    const syncId = "sync-latest-audit"
+    setBusyId(syncId)
+    setError("")
+    try {
+      const auditsResponse = await listProjectAudits(projectId)
+      const latestAudit = auditsResponse.data[0]
+      if (!latestAudit) {
+        throw new Error("\u8fd8\u6ca1\u6709\u53ef\u540c\u6b65\u7684\u68c0\u6d4b\u6279\u6b21\u3002")
+      }
+
+      const collecting = latestAudit.detectionTasks.some(
+        (task) =>
+          task.collectionMethod === "API" &&
+          (task.status === "QUEUED" ||
+            task.status === "RUNNING" ||
+            task.status === "RETRYING"),
+      )
+      if (collecting) {
+        throw new Error(
+          "\u6700\u65b0\u68c0\u6d4b\u4ecd\u5728\u8fdb\u884c\uff0c\u5b8c\u6210\u540e\u518d\u540c\u6b65\u4f18\u5316\u4efb\u52a1\u3002",
+        )
+      }
+
+      const response = await generateOptimizationTasks(
+        projectId,
+        latestAudit.id,
+      )
+      const nextTasks = response.data.data
+      const platformIssueCount = nextTasks.reduce(
+        (sum, task) => sum + taskPlatformIssues(task).length,
+        0,
+      )
+      setTasks(nextTasks)
+      toast.success(
+        `\u5df2\u540c\u6b65\u6700\u65b0\u68c0\u6d4b\uff1a${nextTasks.length} \u6761\u4efb\u52a1\uff0c${platformIssueCount} \u4e2a\u5e73\u53f0\u95ee\u9898`,
+      )
+    } catch (syncError) {
+      const message =
+        syncError instanceof Error
+          ? syncError.message
+          : "\u6700\u65b0\u68c0\u6d4b\u540c\u6b65\u5931\u8d25\u3002"
+      setError(message)
+      toast.error(message)
+    } finally {
+      setBusyId(null)
+    }
   }
 
   async function handleStatus(
@@ -327,13 +494,27 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
             {"\u6839\u636e AI \u68c0\u6d4b\u7ed3\u679c\u751f\u6210\u7684\u5185\u5bb9\u548c\u4e8b\u5b9e\u4fee\u6b63\u4efb\u52a1"}
           </p>
         </div>
-        <Button
-          variant="outline"
-          render={<Link href={`/projects/${projectId}/reports`} />}
-        >
-          <FileTextIcon data-icon="inline-start" />
-          {"\u8fd4\u56de\u62a5\u544a"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={busyId === "sync-latest-audit"}
+            onClick={() => void handleSyncLatestAudit()}
+          >
+            {busyId === "sync-latest-audit" ? (
+              <LoaderCircleIcon className="animate-spin" />
+            ) : (
+              <RefreshCwIcon data-icon="inline-start" />
+            )}
+            {"\u540c\u6b65\u6700\u65b0\u68c0\u6d4b"}
+          </Button>
+          <Button
+            variant="outline"
+            render={<Link href={`/projects/${projectId}/reports`} />}
+          >
+            <FileTextIcon data-icon="inline-start" />
+            {"\u8fd4\u56de\u62a5\u544a"}
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -363,7 +544,7 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
         <>
           <div className="grid grid-cols-2 border-y sm:grid-cols-4">
             {[
-              ["\u5168\u90e8\u4efb\u52a1", tasks.length],
+              ["\u5168\u90e8\u4efb\u52a1", modelTasks.length],
               ["\u5f85\u5904\u7406", openCount],
               ["\u5f85\u9a8c\u8bc1", verifyCount],
               ["\u5df2\u5b8c\u6210", doneCount],
@@ -380,30 +561,75 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
             ))}
           </div>
 
-          <div
-            className="flex max-w-full gap-1 overflow-x-auto rounded-lg border bg-muted p-1"
-            aria-label={"\u4efb\u52a1\u7b5b\u9009"}
-          >
-            {([
-              ["all", "\u5168\u90e8", tasks.length],
-              ["open", "\u5f85\u5904\u7406", openCount],
-              ["verify", "\u5f85\u9a8c\u8bc1", verifyCount],
-              ["done", "\u5df2\u5b8c\u6210", doneCount],
-            ] as const).map(([value, label, count]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={filter === value}
-                onClick={() => setFilter(value)}
-                className={`h-8 shrink-0 rounded-md px-3 text-xs font-medium transition-colors ${
-                  filter === value
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              className="flex max-w-full gap-1 overflow-x-auto rounded-lg border bg-muted p-1"
+              aria-label={"\u4efb\u52a1\u72b6\u6001\u7b5b\u9009"}
+            >
+              {([
+                ["all", "\u5168\u90e8", modelTasks.length],
+                ["open", "\u5f85\u5904\u7406", openCount],
+                ["verify", "\u5f85\u9a8c\u8bc1", verifyCount],
+                ["done", "\u5df2\u5b8c\u6210", doneCount],
+              ] as const).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={filter === value}
+                  onClick={() => setFilter(value)}
+                  className={`h-8 shrink-0 rounded-md px-3 text-xs font-medium transition-colors ${
+                    filter === value
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label} {count}
+                </button>
+              ))}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {"\u6a21\u578b"}
+              </span>
+              <Select
+                value={modelFilter}
+                onValueChange={(value) => {
+                  if (value !== null) setModelFilter(value)
+                }}
               >
-                {label} {count}
-              </button>
-            ))}
+                <SelectTrigger
+                  size="sm"
+                  className="w-44"
+                  aria-label={"\u6309 AI \u6a21\u578b\u7b5b\u9009"}
+                >
+                  <SelectValue>
+                    {(value) => {
+                      if (value === "all") {
+                        return `\u5168\u90e8\u6a21\u578b (${tasks.length})`
+                      }
+                      const selectedModel = modelOptions.find(
+                        (model) => model.key === value,
+                      )
+                      return selectedModel
+                        ? `${selectedModel.label} (${selectedModel.count})`
+                        : value
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectGroup>
+                    <SelectItem value="all">
+                      {"\u5168\u90e8\u6a21\u578b"} ({tasks.length})
+                    </SelectItem>
+                    {modelOptions.map((model) => (
+                      <SelectItem key={model.key} value={model.key}>
+                        {model.label} ({model.count})
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {visibleTasks.length ? (
@@ -417,12 +643,13 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
                 const latestVerification = task.verifications[0]
                 const taskClosed = ["VERIFIED", "DISMISSED"].includes(task.status)
                 const expanded = expandedTaskIds.has(task.id)
+                const platformIssues = taskPlatformIssues(task)
                 return (
                   <Card key={task.id} className="rounded-lg shadow-none">
                     <CardHeader className="px-0">
                       <button
                         type="button"
-                        className="flex w-full cursor-pointer flex-col justify-between gap-3 px-4 py-1 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 sm:flex-row sm:items-start"
+                        className="flex w-full cursor-pointer flex-col justify-between gap-3 px-4 py-1 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 sm:flex-row sm:items-center"
                         aria-expanded={expanded}
                         aria-controls={`task-details-${task.id}`}
                         onClick={() => handleTaskToggle(task.id)}
@@ -431,6 +658,22 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
                           <span className="block text-sm font-medium leading-6">
                             {task.title}
                           </span>
+                          {platformIssues.length ? (
+                            <span className="mt-2 flex flex-wrap gap-1.5">
+                              {platformIssues.map((issue) => (
+                                <Badge
+                                  key={issue.key}
+                                  variant="outline"
+                                  className={
+                                    platformIssueMeta[issue.category].className
+                                  }
+                                >
+                                  {issue.label} {"\u00b7"}{" "}
+                                  {platformIssueMeta[issue.category].label}
+                                </Badge>
+                              ))}
+                            </span>
+                          ) : null}
                         </span>
                         <span className="flex shrink-0 flex-wrap items-center gap-2">
                           <Badge
@@ -460,6 +703,46 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
                       className="grid gap-4"
                       hidden={!expanded}
                     >
+                      {platformIssues.length ? (
+                        <section className="grid gap-3 border-t pt-4">
+                          <p className="text-sm font-medium">
+                            {"AI \u5e73\u53f0\u95ee\u9898"}
+                          </p>
+                          <div
+                            className={`grid gap-3 ${
+                              platformIssues.length > 1
+                                ? "md:grid-cols-2"
+                                : "w-full grid-cols-1"
+                            }`}
+                          >
+                            {platformIssues.map((issue) => (
+                              <div
+                                key={issue.key}
+                                className="min-w-0 border-l-2 border-muted-foreground/25 pl-3"
+                              >
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge variant="outline">{issue.label}</Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      platformIssueMeta[issue.category]
+                                        .className
+                                    }
+                                  >
+                                    {platformIssueMeta[issue.category].label}
+                                  </Badge>
+                                </div>
+                                {issue.quote ? (
+                                  <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                                    {issue.quote}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+
                       <div className="grid gap-4 border-y py-4 md:grid-cols-2">
                         <div>
                           <p className="text-xs font-medium">{"\u5f53\u524d\u95ee\u9898"}</p>
@@ -475,65 +758,89 @@ export function ProjectOptimizationTasks({ projectId }: { projectId: string }) {
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                        {task.suggestedPosition ? (
-                          <p>
-                            <span className="text-muted-foreground">
-                              {"\u5efa\u8bae\u4f4d\u7f6e\uff1a"}
-                            </span>
-                            {task.suggestedPosition}
-                          </p>
-                        ) : null}
-                        {task.suggestedUrl ? (
-                          <p className="min-w-0">
-                            <span className="text-muted-foreground">
-                              {"\u5efa\u8bae\u8def\u5f84\uff1a"}
-                            </span>
-                            <span className="break-all">{task.suggestedUrl}</span>
-                          </p>
-                        ) : null}
-                      </div>
+                      <div className="flex items-start justify-between gap-3 text-sm">
+                        <div className="flex min-w-0 flex-wrap gap-x-6 gap-y-2">
+                          {task.suggestedPosition ? (
+                            <p>
+                              <span className="text-muted-foreground">
+                                {"\u5efa\u8bae\u4f4d\u7f6e\uff1a"}
+                              </span>
+                              {task.suggestedPosition}
+                            </p>
+                          ) : null}
+                          {task.suggestedUrl ? (
+                            <p className="min-w-0">
+                              <span className="text-muted-foreground">
+                                {"\u5efa\u8bae\u8def\u5f84\uff1a"}
+                              </span>
+                              <span className="break-all">{task.suggestedUrl}</span>
+                            </p>
+                          ) : null}
+                        </div>
 
-                      {metrics.expected ? (
-                        <section className="grid gap-3 border-y bg-sky-50/60 p-4">
-                          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
-                            <div>
+                        {metrics.expected ? (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <button
+                                  type="button"
+                                  aria-label={"\u67e5\u770b\u66dd\u5149\u6548\u679c\u9884\u671f"}
+                                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                                >
+                                  <InfoIcon className="size-4" aria-hidden="true" />
+                                </button>
+                              }
+                            />
+                            <TooltipContent
+                              side="bottom"
+                              align="end"
+                              sideOffset={6}
+                              className="block max-h-[min(28rem,calc(100vh-2rem))] w-[min(24rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-y-auto p-4 text-left"
+                            >
                               <p className="text-sm font-medium">
                                 {"\u66dd\u5149\u6548\u679c\u9884\u671f"}
                               </p>
-                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                {metrics.expectation}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="grid gap-3 text-sm md:grid-cols-2">
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {"\u671f\u671b\u6539\u5584\u6307\u6807"}
-                              </p>
-                              <p className="mt-1 leading-6">{metrics.expected}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {"\u4e3a\u4ec0\u4e48\u53ef\u80fd\u6709\u6548"}
-                              </p>
-                              <p className="mt-1 leading-6">{metrics.mechanism}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {"\u600e\u4e48\u5224\u65ad\u662f\u5426\u6539\u5584"}
-                              </p>
-                              <p className="mt-1 leading-6">{metrics.measurement}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground">
-                                {"\u5efa\u8bae\u590d\u6d4b\u65f6\u95f4"}
-                              </p>
-                              <p className="mt-1 leading-6">{metrics.timeframe}</p>
-                            </div>
-                          </div>
-                        </section>
-                      ) : null}
+                              {metrics.expectation ? (
+                                <p className="mt-1 leading-5 text-background/75">
+                                  {metrics.expectation}
+                                </p>
+                              ) : null}
+                              <dl className="mt-3 grid gap-3 border-t border-background/15 pt-3">
+                                <div>
+                                  <dt className="text-background/65">
+                                    {"\u671f\u671b\u6539\u5584\u6307\u6807"}
+                                  </dt>
+                                  <dd className="mt-1 leading-5">{metrics.expected}</dd>
+                                </div>
+                                {metrics.mechanism ? (
+                                  <div>
+                                    <dt className="text-background/65">
+                                      {"\u4e3a\u4ec0\u4e48\u53ef\u80fd\u6709\u6548"}
+                                    </dt>
+                                    <dd className="mt-1 leading-5">{metrics.mechanism}</dd>
+                                  </div>
+                                ) : null}
+                                {metrics.measurement ? (
+                                  <div>
+                                    <dt className="text-background/65">
+                                      {"\u600e\u4e48\u5224\u65ad\u662f\u5426\u6539\u5584"}
+                                    </dt>
+                                    <dd className="mt-1 leading-5">{metrics.measurement}</dd>
+                                  </div>
+                                ) : null}
+                                {metrics.timeframe ? (
+                                  <div>
+                                    <dt className="text-background/65">
+                                      {"\u5efa\u8bae\u590d\u6d4b\u65f6\u95f4"}
+                                    </dt>
+                                    <dd className="mt-1 leading-5">{metrics.timeframe}</dd>
+                                  </div>
+                                ) : null}
+                              </dl>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                      </div>
 
                       {requirements.suggestedDraft ? (
                         <div className="overflow-hidden rounded-lg border">

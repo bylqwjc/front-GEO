@@ -252,12 +252,31 @@ export function getBilling() {
   return apiRequest("/billing", {}, z.object({ data: billingSchema }))
 }
 
+const visibilityScoreDimensionSchema = z.object({
+  key: z.enum([
+    "MENTION",
+    "RECOMMENDATION",
+    "PROMINENCE",
+    "DESCRIPTION",
+    "SENTIMENT",
+    "CITATION",
+  ]),
+  label: z.string(),
+  score: z.number().int(),
+  maxScore: z.number().int(),
+  reason: z.string(),
+})
+
 const manualAnalysisSchema = z.object({
   targetMentioned: z.boolean(),
   targetRecommended: z.boolean(),
   factRisk: z.boolean(),
   confidence: z.number(),
   evidenceQuotes: z.unknown(),
+  visibilityScore: z.number().int().min(0).max(100).nullable(),
+  visibilityLevel: z.enum(["NO_VISIBILITY", "WEAK", "LIMITED", "GOOD", "STRONG", "EXCELLENT"]).nullable(),
+  scoreBreakdown: z.array(visibilityScoreDimensionSchema).nullable(),
+  scoreVersion: z.string().nullable(),
 })
 
 const manualAuditCitationSchema = z.object({
@@ -289,6 +308,7 @@ const manualAuditTaskSchema = z.object({
     "YUANBAO",
   ]),
   platformProduct: z.string().nullable(),
+  monitoringPrompt: z.string(),
   prompt: z.object({
     id: z.string(),
     text: z.string(),
@@ -352,15 +372,33 @@ export function submitManualAuditAnswer(
 }
 
 
+export type AutomaticCollectionPlatform = "deepseek" | "doubao"
+
+export function startAutomaticCollection(
+  projectId: string,
+  auditId: string,
+  platform: AutomaticCollectionPlatform,
+) {
+  const path =
+    "/projects/" +
+    projectId +
+    "/audits/" +
+    auditId +
+    "/collect?platform=" +
+    platform
+
+  return apiRequest(
+    path,
+    { method: "POST" },
+    z.object({ data: manualAuditSchema }),
+  )
+}
+
 export function startDoubaoAutomaticCollection(
   projectId: string,
   auditId: string,
 ) {
-  return apiRequest(
-    `/projects/${projectId}/audits/${auditId}/collect`,
-    { method: 'POST' },
-    z.object({ data: manualAuditSchema }),
-  )
+  return startAutomaticCollection(projectId, auditId, "doubao")
 }
 
 const optimizationTaskStatusSchema = z.enum([

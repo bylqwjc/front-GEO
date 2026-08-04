@@ -15,6 +15,7 @@ import {
   FileSearchIcon,
   LoaderCircleIcon,
   PlayIcon,
+  RefreshCwIcon,
   SendIcon,
   ThumbsUpIcon,
 } from "lucide-react"
@@ -32,11 +33,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { VisibilityScoreBadge } from "@/components/brand-visibility-score-badge"
 import {
   createManualAudit,
   getProject,
   listProjectAudits,
-  startDoubaoAutomaticCollection,
+  startAutomaticCollection,
   submitManualAuditAnswer,
   type ManualAudit,
   type ManualAuditPlatform,
@@ -85,7 +87,7 @@ const ui = {
   factMatch: "\u5339\u914d\u54c1\u724c\u4e8b\u5b9e",
   sources: "\u5f15\u7528\u6765\u6e90",
   retryFailure:
-    "\u672c\u6b21\u76d1\u6d4b\u672a\u8fd4\u56de\u53ef\u7528\u7b54\u6848\uff0c\u53ef\u70b9\u51fb\u201c\u81ea\u52a8\u76d1\u6d4b\u8c46\u5305\u201d\u91cd\u8bd5\u3002",
+    "本次监测未返回可用答案，可点击上方“重新监测”重试。",
   createFailed: "\u68c0\u6d4b\u521b\u5efa\u5931\u8d25\u3002",
   submitFailed: "\u56de\u7b54\u63d0\u4ea4\u5931\u8d25\u3002",
   submitted: "\u56de\u7b54\u5df2\u4fdd\u5b58\u5e76\u5b8c\u6210\u5206\u6790",
@@ -123,35 +125,6 @@ function platformForTask(task: ManualAuditTask) {
 const textareaClass =
   "min-h-36 w-full resize-y rounded-lg border border-input bg-background px-3 py-2 text-sm leading-6 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
 
-function buildManualTestPrompt(question: string) {
-   const isChinese = /[\u3400-\u9fff]/.test(question)
-   const lines = isChinese
-     ? [
-         "\u8bf7\u72ec\u7acb\u56de\u7b54\u4e0b\u9762\u7684\u95ee\u9898\u3002",
-         "",
-         "\u8981\u6c42\uff1a",
-         "1. \u76f4\u63a5\u7ed9\u51fa\u7ed3\u8bba\uff0c\u4e0d\u8981\u5411\u6211\u8ffd\u95ee\u3002",
-         "2. \u5982\u6d89\u53ca\u4ea7\u54c1\u6216\u5de5\u5177\u63a8\u8350\uff0c\u8bf7\u7ed9\u51fa 3-5 \u4e2a\u5177\u4f53\u9009\u9879\u5e76\u5206\u522b\u8bf4\u660e\u7406\u7531\u3002",
-         "3. \u8bf7\u533a\u5206\u786e\u5b9a\u4e8b\u5b9e\u548c\u63a8\u6d4b\uff1b\u4e0d\u786e\u5b9a\u7684\u4fe1\u606f\u8bf7\u660e\u786e\u8bf4\u660e\u3002",
-         "4. \u5982\u679c\u80fd\u591f\u63d0\u4f9b\u6765\u6e90\uff0c\u8bf7\u9644\u4e0a\u53ef\u8bbf\u95ee\u7684\u94fe\u63a5\u3002",
-         "",
-         `\u95ee\u9898\uff1a${question}`,
-       ]
-     : [
-         "Answer the following question independently.",
-         "",
-         "Requirements:",
-         "1. Give a direct answer without asking follow-up questions.",
-         "2. If products or tools are requested, list 3-5 specific options and explain each choice.",
-         "3. Separate established facts from assumptions and state uncertainty clearly.",
-         "4. Include accessible source links when available.",
-         "",
-         `Question: ${question}`,
-       ]
-   return lines.join("\n")
- }
- 
-
 function latestAnswer(task: ManualAuditTask) {
   return task.answers[0]
 }
@@ -164,6 +137,64 @@ function matchedFactCount(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return 0
   const facts = (value as { matchedFacts?: unknown }).matchedFacts
   return Array.isArray(facts) ? facts.length : 0
+}
+
+function AnalysisBadges({
+  analysis,
+  className = "",
+}: {
+  analysis: NonNullable<ReturnType<typeof latestAnalysis>>
+  className?: string
+}) {
+  const matchedFacts = matchedFactCount(analysis.evidenceQuotes)
+
+  return (
+    <span className={`flex flex-wrap gap-1.5 ${className}`}>
+      <VisibilityScoreBadge
+        score={analysis.visibilityScore}
+        level={analysis.visibilityLevel}
+        breakdown={analysis.scoreBreakdown}
+        version={analysis.scoreVersion}
+      />
+      <Badge
+        variant="outline"
+        className={
+          analysis.targetMentioned
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : "border-amber-200 bg-amber-50 text-amber-800"
+        }
+      >
+        {analysis.targetMentioned ? (
+          <CheckCircle2Icon />
+        ) : (
+          <CircleAlertIcon />
+        )}
+        {analysis.targetMentioned ? ui.mentionYes : ui.mentionNo}
+      </Badge>
+      {analysis.targetRecommended ? (
+        <Badge
+          variant="outline"
+          className="border-emerald-200 bg-emerald-50 text-emerald-700"
+        >
+          <ThumbsUpIcon />
+          {ui.recommendYes}
+        </Badge>
+      ) : null}
+      <Badge
+        variant="outline"
+        className={
+          analysis.factRisk
+            ? "border-rose-200 bg-rose-50 text-rose-700"
+            : "bg-muted text-muted-foreground"
+        }
+      >
+        {analysis.factRisk ? <CircleAlertIcon /> : <CheckCircle2Icon />}
+        {analysis.factRisk
+          ? ui.factRisk
+          : `${ui.factMatch} ${matchedFacts}`}
+      </Badge>
+    </span>
+  )
 }
 
 export function ProjectAudits({ projectId }: { projectId: string }) {
@@ -184,6 +215,8 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [resultTaskId, setResultTaskId] = useState<string | null>(null)
+  const [automaticConfirmationOpen, setAutomaticConfirmationOpen] =
+    useState(false)
   const [error, setError] = useState("")
 
   const load = useCallback(
@@ -247,6 +280,9 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
   const selectedResultAnswer = selectedResultTask
     ? latestAnswer(selectedResultTask)
     : undefined
+  const selectedResultAnalysis = selectedResultTask
+    ? latestAnalysis(selectedResultTask)
+    : undefined
   const mentionedCount = tasks.filter(
     (task) => latestAnalysis(task)?.targetMentioned,
   ).length
@@ -262,22 +298,42 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
   const hasPendingApiTasks = tasks.some(
     (task) =>
       task.collectionMethod === "API" &&
-      (task.status === "QUEUED" || task.status === "RUNNING"),
+      (task.status === "QUEUED" ||
+        task.status === "RUNNING" ||
+        task.status === "RETRYING"),
   )
-  const pendingDoubaoTasks = visibleTasks.filter(
-    (task) =>
-      task.engine === 'DOUBAO' &&
-      !latestAnswer(task) &&
-      (task.status === 'WAITING_MANUAL' || task.status === 'FAILED'),
-  )
-  const doubaoCollecting = visibleTasks.some(
-    (task) =>
-      task.engine === 'DOUBAO' &&
-      task.collectionMethod === 'API' &&
-      (task.status === 'QUEUED' ||
-        task.status === 'RUNNING' ||
-        task.status === 'RETRYING'),
-  )
+  const automaticPlatformId =
+    activeEngine === "DEEPSEEK"
+      ? "deepseek"
+      : activeEngine === "DOUBAO"
+        ? "doubao"
+        : null
+  const automaticPlatformLabel =
+    platformByEngine.get(activeEngine)?.label ?? activeEngine
+  const automaticBusyId = automaticPlatformId
+    ? "auto-" + automaticPlatformId
+    : null
+  const runnableAutomaticTasks = automaticPlatformId
+    ? visibleTasks.filter(
+        (task) =>
+          task.status === "WAITING_MANUAL" ||
+          task.status === "FAILED" ||
+          task.status === "COLLECTED" ||
+          task.status === "ANALYZED",
+      )
+    : []
+  const hasAutomaticAnswers = automaticPlatformId
+    ? visibleTasks.some((task) => Boolean(latestAnswer(task)))
+    : false
+  const automaticCollecting = automaticPlatformId
+    ? visibleTasks.some(
+        (task) =>
+          task.collectionMethod === "API" &&
+          (task.status === "QUEUED" ||
+            task.status === "RUNNING" ||
+            task.status === "RETRYING"),
+      )
+    : false
 
   useEffect(() => {
     if (!selectedAudit || !hasPendingApiTasks) return
@@ -364,21 +420,46 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
     }
   }
 
-  async function handleStartDoubaoAutomaticCollection() {
-    if (!selectedAudit || pendingDoubaoTasks.length < 1) return
-    setBusyId('auto-doubao')
-    setError('')
+  async function handleStartAutomaticCollection() {
+    if (
+      !selectedAudit ||
+      !automaticPlatformId ||
+      !automaticBusyId ||
+      runnableAutomaticTasks.length < 1
+    ) {
+      return
+    }
+    setBusyId(automaticBusyId)
+    setError("")
     try {
-      await startDoubaoAutomaticCollection(projectId, selectedAudit.id)
+      await startAutomaticCollection(
+        projectId,
+        selectedAudit.id,
+        automaticPlatformId,
+      )
       await load(selectedAudit.id)
-      toast.success(ui.autoStarted)
+      toast.success(
+        hasAutomaticAnswers
+          ? automaticPlatformLabel + " 重新监测已开始"
+          : automaticPlatformLabel + " 自动监测已开始",
+      )
     } catch (collectError) {
       setError(
-        collectError instanceof Error ? collectError.message : ui.autoFailed,
+        collectError instanceof Error
+          ? collectError.message
+          : automaticPlatformLabel + " \u81ea\u52a8\u76d1\u6d4b\u542f\u52a8\u5931\u8d25\u3002",
       )
     } finally {
       setBusyId(null)
     }
+  }
+
+  function handleAutomaticCollectionRequest() {
+    if (hasAutomaticAnswers) {
+      setAutomaticConfirmationOpen(true)
+      return
+    }
+    void handleStartAutomaticCollection()
   }
 
   if (loading) return <LoadingState label={ui.loading} />
@@ -603,26 +684,36 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
             })}
           </nav>
 
-          {activeEngine === 'DOUBAO' ? (
-            <div className={'flex justify-end'}>
+          {automaticPlatformId ? (
+            <div className="flex justify-end">
               <Button
-                onClick={() => void handleStartDoubaoAutomaticCollection()}
+                onClick={handleAutomaticCollectionRequest}
                 disabled={
-                  busyId === 'auto-doubao' ||
-                  doubaoCollecting ||
-                  pendingDoubaoTasks.length < 1
+                  busyId === automaticBusyId ||
+                  automaticCollecting ||
+                  runnableAutomaticTasks.length < 1
                 }
               >
-                {busyId === 'auto-doubao' || doubaoCollecting ? (
-                  <LoaderCircleIcon className={'animate-spin'} />
+                {busyId === automaticBusyId || automaticCollecting ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : hasAutomaticAnswers ? (
+                  <RefreshCwIcon data-icon="inline-start" />
                 ) : (
-                  <PlayIcon data-icon={'inline-start'} />
+                  <PlayIcon data-icon="inline-start" />
                 )}
-                {busyId === 'auto-doubao' || doubaoCollecting
-                  ? ui.autoMonitoring
-                  : pendingDoubaoTasks.length > 0
-                    ? `${ui.autoMonitor} (${pendingDoubaoTasks.length})`
-                    : ui.autoComplete}
+                {busyId === automaticBusyId || automaticCollecting
+                  ? automaticPlatformLabel + " \u76d1\u6d4b\u4e2d"
+                  : hasAutomaticAnswers
+                    ? "重新监测 " +
+                      automaticPlatformLabel +
+                      " (" +
+                      runnableAutomaticTasks.length +
+                      ")"
+                    : "自动监测 " +
+                      automaticPlatformLabel +
+                      " (" +
+                      runnableAutomaticTasks.length +
+                      ")"}
               </Button>
             </div>
           ) : null}
@@ -633,9 +724,7 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
               const answer = latestAnswer(task)
               const automated = task.collectionMethod === "API"
               const analysis = latestAnalysis(task)
-              const matchedFacts = analysis
-                ? matchedFactCount(analysis.evidenceQuotes)
-                : 0
+
               const draft = automated
                 ? (answer?.content ?? "")
                 : (drafts[task.id] ?? answer?.content ?? "")
@@ -655,9 +744,16 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
                         <span className="mt-0.5 w-6 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                           {String(index + 1).padStart(2, "0")}
                         </span>
-                        <span className="text-sm font-medium leading-6">
-                          {task.prompt.text}
-                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium leading-6">
+                            {task.prompt.text}
+                          </span>
+                          {analysis ? (
+                            <AnalysisBadges
+                              analysis={analysis}
+                              className="mt-2"
+                            />
+                          ) : null}                        </span>
                       </button>
                       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                         <Badge
@@ -680,22 +776,24 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
                             {ui.viewFullResult}
                           </Button>
                         ) : null}
-                        <Badge
-                          variant="outline"
-                          className={
-                            answer
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "bg-muted text-muted-foreground"
-                          }
-                        >
-                          {answer
-                            ? ui.analyzed
-                            : task.status === 'FAILED'
-                              ? ui.failed
-                              : automated
-                              ? ui.apiCollecting
-                              : ui.pending}
-                        </Badge>
+                        {!analysis ? (
+                          <Badge
+                            variant="outline"
+                            className={
+                              answer
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "bg-muted text-muted-foreground"
+                            }
+                          >
+                            {answer
+                              ? ui.analyzed
+                              : task.status === 'FAILED'
+                                ? ui.failed
+                                : automated
+                                  ? ui.apiCollecting
+                                  : ui.pending}
+                          </Badge>
+                        ) : null}
                         <Button
                           variant="ghost"
                           size="icon-sm"
@@ -720,7 +818,7 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => void handleCopy(buildManualTestPrompt(task.prompt.text))}
+                        onClick={() => void handleCopy(task.monitoringPrompt)}
                       >
                         <ClipboardIcon data-icon="inline-start" />
                         {ui.copy}
@@ -813,53 +911,6 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
                         </div>
                       </div>
                     ) : null}
-                    {analysis ? (
-                      <div className="flex flex-wrap gap-2">
-                        <Badge
-                          variant="outline"
-                          className={
-                            analysis.targetMentioned
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-800"
-                          }
-                        >
-                          {analysis.targetMentioned ? (
-                            <CheckCircle2Icon />
-                          ) : (
-                            <CircleAlertIcon />
-                          )}
-                          {analysis.targetMentioned
-                            ? ui.mentionYes
-                            : ui.mentionNo}
-                        </Badge>
-                        {analysis.targetRecommended ? (
-                          <Badge
-                            variant="outline"
-                            className="border-emerald-200 bg-emerald-50 text-emerald-700"
-                          >
-                            <ThumbsUpIcon />
-                            {ui.recommendYes}
-                          </Badge>
-                        ) : null}
-                        <Badge
-                          variant="outline"
-                          className={
-                            analysis.factRisk
-                              ? "border-rose-200 bg-rose-50 text-rose-700"
-                              : "bg-muted text-muted-foreground"
-                          }
-                        >
-                          {analysis.factRisk ? (
-                            <CircleAlertIcon />
-                          ) : (
-                            <CheckCircle2Icon />
-                          )}
-                          {analysis.factRisk
-                            ? ui.factRisk
-                            : `${ui.factMatch} ${matchedFacts}`}
-                        </Badge>
-                      </div>
-                    ) : null}
                     {!automated ? <div className="flex justify-end">
                       <Button
                         onClick={() => void handleSubmit(task)}
@@ -884,6 +935,38 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
           </div>
         </>
       )}
+      <Dialog
+        open={automaticConfirmationOpen}
+        onOpenChange={setAutomaticConfirmationOpen}
+      >
+        <DialogContent className="max-w-md" showCloseButton={false}>
+          <DialogHeader className="pr-5">
+            <DialogTitle>
+              {`\u786e\u8ba4\u91cd\u65b0\u76d1\u6d4b ${automaticPlatformLabel}\uff1f`}
+            </DialogTitle>
+            <DialogDescription>
+              {"\u65b0\u7ed3\u679c\u6210\u529f\u540e\u5c06\u8986\u76d6\u5f53\u524d\u7b54\u6848\u3002\u5982\u679c\u76d1\u6d4b\u5931\u8d25\uff0c\u5f53\u524d\u7b54\u6848\u4ecd\u4f1a\u4fdd\u7559\u3002"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 px-5 py-4">
+            <Button
+              variant="outline"
+              onClick={() => setAutomaticConfirmationOpen(false)}
+            >
+              {"\u53d6\u6d88"}
+            </Button>
+            <Button
+              onClick={() => {
+                setAutomaticConfirmationOpen(false)
+                void handleStartAutomaticCollection()
+              }}
+            >
+              <RefreshCwIcon data-icon="inline-start" />
+              {"\u786e\u8ba4\u91cd\u65b0\u76d1\u6d4b"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {selectedResultTask && selectedResultAnswer ? (
         <Dialog
           open
@@ -948,6 +1031,12 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
                 </Button>
               </div>
             </div>
+
+            {selectedResultAnalysis ? (
+              <div className="shrink-0 border-b px-5 py-3">
+                <AnalysisBadges analysis={selectedResultAnalysis} />
+              </div>
+            ) : null}
 
             <div
               key={selectedResultTask.id}
