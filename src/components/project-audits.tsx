@@ -15,6 +15,7 @@ import {
   FileSearchIcon,
   LoaderCircleIcon,
   PlayIcon,
+  PlusIcon,
   RefreshCwIcon,
   SendIcon,
   ThumbsUpIcon,
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/dialog"
 import { VisibilityScoreBadge } from "@/components/brand-visibility-score-badge"
 import {
+  addManualAuditPlatforms,
   createManualAudit,
   getProject,
   listProjectAudits,
@@ -63,7 +65,7 @@ const ui = {
   loadFailed: "\u68c0\u6d4b\u4efb\u52a1\u52a0\u8f7d\u5931\u8d25\u3002",
   projectMissing: "\u9879\u76ee\u4e0d\u5b58\u5728\u3002",
   platforms: "\u68c0\u6d4b\u5e73\u53f0",
-  platformsHint: "\u8c46\u5305\u53ef\u76f4\u63a5\u81ea\u52a8\u91c7\u96c6\uff0c\u5176\u4ed6\u5e73\u53f0\u53ef\u6309\u9700\u52a0\u5165\u5bf9\u6bd4\u3002",
+  platformsHint: "DeepSeek\u3001Kimi \u548c\u8c46\u5305\u53ef\u81ea\u52a8\u8054\u7f51\u91c7\u96c6\uff0cChatGPT \u4f7f\u7528\u4eba\u5de5\u7c98\u8d34\u3002",
   questionCount: "\u6bcf\u4e2a\u5e73\u53f0\u7684\u95ee\u9898\u6570",
   total: "\u603b\u4efb\u52a1\u6570",
   completed: "\u5df2\u63d0\u4ea4",
@@ -149,13 +151,15 @@ function AnalysisBadges({
   const matchedFacts = matchedFactCount(analysis.evidenceQuotes)
 
   return (
-    <span className={`flex flex-wrap gap-1.5 ${className}`}>
-      <VisibilityScoreBadge
-        score={analysis.visibilityScore}
-        level={analysis.visibilityLevel}
-        breakdown={analysis.scoreBreakdown}
-        version={analysis.scoreVersion}
-      />
+    <span className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+      {analysis.targetMentioned ? (
+        <VisibilityScoreBadge
+          score={analysis.visibilityScore}
+          level={analysis.visibilityLevel}
+          breakdown={analysis.scoreBreakdown}
+          version={analysis.scoreVersion}
+        />
+      ) : null}
       <Badge
         variant="outline"
         className={
@@ -268,6 +272,15 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
   const auditPlatforms = platformOptions.filter((platform) =>
     tasks.some((task) => task.engine === platform.engine),
   )
+  const missingSelectedPlatforms = platformOptions.filter(
+    (platform) =>
+      selectedPlatforms.includes(platform.id) &&
+      !tasks.some((task) => task.engine === platform.engine),
+  )
+  const auditPromptCount = new Set(tasks.map((task) => task.prompt.id)).size
+  const missingPlatformTaskCount =
+    auditPromptCount * missingSelectedPlatforms.length
+
   const activeEngine = tasks.some((task) => task.engine === selectedEngine)
     ? selectedEngine
     : (tasks[0]?.engine ?? selectedEngine)
@@ -305,9 +318,11 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
   const automaticPlatformId =
     activeEngine === "DEEPSEEK"
       ? "deepseek"
-      : activeEngine === "DOUBAO"
-        ? "doubao"
-        : null
+      : activeEngine === "KIMI"
+        ? "kimi"
+        : activeEngine === "DOUBAO"
+          ? "doubao"
+          : null
   const automaticPlatformLabel =
     platformByEngine.get(activeEngine)?.label ?? activeEngine
   const automaticBusyId = automaticPlatformId
@@ -382,6 +397,39 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
       )
     } catch (startError) {
       setError(startError instanceof Error ? startError.message : ui.createFailed)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleAddSelectedPlatforms() {
+    if (!selectedAudit || missingSelectedPlatforms.length < 1) return
+    const platformsToAdd = missingSelectedPlatforms
+    setBusyId("add-platforms")
+    setError("")
+    try {
+      await addManualAuditPlatforms(
+        projectId,
+        selectedAudit.id,
+        platformsToAdd.map((platform) => platform.id),
+      )
+      setSelectedEngine(platformsToAdd[0].engine)
+      await load(selectedAudit.id)
+      toast.success(
+        "\u5df2\u6dfb\u52a0 " +
+          platformsToAdd
+            .map((platform) => platform.label)
+            .join("\u3001") +
+          " \u76d1\u6d4b\uff0c\u5171 " +
+          missingPlatformTaskCount +
+          " \u6761\u4efb\u52a1",
+      )
+    } catch (addError) {
+      setError(
+        addError instanceof Error
+          ? addError.message
+          : "\u6dfb\u52a0\u76d1\u6d4b\u5e73\u53f0\u5931\u8d25\u3002",
+      )
     } finally {
       setBusyId(null)
     }
@@ -651,38 +699,63 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
             ) : null}
           </div>
 
-          <nav
-            className="flex gap-1 overflow-x-auto border-b"
-            aria-label="\u68c0\u6d4b\u5e73\u53f0"
-          >
-            {auditPlatforms.map((platform) => {
-              const platformTasks = tasks.filter(
-                (task) => task.engine === platform.engine,
-              )
-              const platformCompleted = platformTasks.filter((task) =>
-                latestAnswer(task),
-              ).length
-              const active = activeEngine === platform.engine
-              return (
-                <button
-                  key={platform.engine}
-                  type="button"
-                  className={`h-10 shrink-0 border-b-2 px-4 text-sm transition-colors ${
-                    active
-                      ? "border-emerald-600 font-medium text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => setSelectedEngine(platform.engine)}
-                >
-                  {platform.label}{" "}
-                  <span className="tabular-nums text-muted-foreground">
-                    {platformCompleted}/{platformTasks.length}
-                  </span>
-                </button>
-              )
-            })}
-          </nav>
+          <div className="flex items-end gap-2 border-b">
+            <nav
+              className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+              aria-label="\u68c0\u6d4b\u5e73\u53f0"
+            >
+              {auditPlatforms.map((platform) => {
+                const platformTasks = tasks.filter(
+                  (task) => task.engine === platform.engine,
+                )
+                const platformCompleted = platformTasks.filter((task) =>
+                  latestAnswer(task),
+                ).length
+                const active = activeEngine === platform.engine
+                return (
+                  <button
+                    key={platform.engine}
+                    type="button"
+                    className={`h-10 shrink-0 border-b-2 px-4 text-sm transition-colors ${
+                      active
+                        ? "border-emerald-600 font-medium text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                    aria-current={active ? "page" : undefined}
+                    onClick={() => setSelectedEngine(platform.engine)}
+                  >
+                    {platform.label}{" "}
+                    <span className="tabular-nums text-muted-foreground">
+                      {platformCompleted}/{platformTasks.length}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+            {missingSelectedPlatforms.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mb-1 shrink-0"
+                onClick={() => void handleAddSelectedPlatforms()}
+                disabled={busyId === "add-platforms"}
+              >
+                {busyId === "add-platforms" ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  <PlusIcon data-icon="inline-start" />
+                )}
+                {"\u6dfb\u52a0 "}
+                {missingSelectedPlatforms.length === 1
+                  ? missingSelectedPlatforms[0].label
+                  : String(missingSelectedPlatforms.length) +
+                    " \u4e2a\u5e73\u53f0"}
+                {" \u76d1\u6d4b ("}
+                {missingPlatformTaskCount}
+                {")"}
+              </Button>
+            ) : null}
+          </div>
 
           {automaticPlatformId ? (
             <div className="flex justify-end">
@@ -734,27 +807,30 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
                 <Card key={task.id} className="rounded-lg shadow-none">
                   <CardHeader className="gap-3 px-0">
                     <div className="flex flex-col gap-3 px-4 py-1 sm:flex-row sm:items-start">
-                      <button
-                        type="button"
-                        className="flex min-w-0 flex-1 cursor-pointer gap-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-                        aria-expanded={expanded}
-                        aria-controls={`audit-task-details-${task.id}`}
-                        onClick={() => handleTaskToggle(task.id)}
-                      >
+                      <div className="flex min-w-0 flex-1 gap-3">
                         <span className="mt-0.5 w-6 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                           {String(index + 1).padStart(2, "0")}
                         </span>
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium leading-6">
-                            {task.prompt.text}
-                          </span>
+                        <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            className="block w-full cursor-pointer text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                            aria-expanded={expanded}
+                            aria-controls={`audit-task-details-${task.id}`}
+                            onClick={() => handleTaskToggle(task.id)}
+                          >
+                            <span className="block text-sm font-medium leading-6">
+                              {task.prompt.text}
+                            </span>
+                          </button>
                           {analysis ? (
                             <AnalysisBadges
                               analysis={analysis}
                               className="mt-2"
                             />
-                          ) : null}                        </span>
-                      </button>
+                          ) : null}
+                        </div>
+                      </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                         <Badge
                           variant="outline"

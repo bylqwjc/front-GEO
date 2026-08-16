@@ -3,6 +3,7 @@ export type EngineId =
   | "perplexity"
   | "gemini"
   | "deepseek"
+  | "kimi"
   | "doubao"
   | "yuanbao"
 

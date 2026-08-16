@@ -358,6 +358,29 @@ export function createManualAudit(
   )
 }
 
+export function addManualAuditPlatforms(
+  projectId: string,
+  auditId: string,
+  platforms: ManualAuditPlatform[],
+) {
+  const path =
+    "/projects/" +
+    projectId +
+    "/audits/" +
+    auditId +
+    "/platforms"
+
+  return apiRequest(
+    path,
+    {
+      method: "POST",
+      body: JSON.stringify({ platforms }),
+    },
+    z.object({ data: manualAuditSchema }),
+  )
+}
+
+
 export function submitManualAuditAnswer(
   projectId: string,
   auditId: string,
@@ -372,7 +395,7 @@ export function submitManualAuditAnswer(
 }
 
 
-export type AutomaticCollectionPlatform = "deepseek" | "doubao"
+export type AutomaticCollectionPlatform = "deepseek" | "kimi" | "doubao"
 
 export function startAutomaticCollection(
   projectId: string,

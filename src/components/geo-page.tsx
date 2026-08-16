@@ -39,6 +39,7 @@ export function EngineMark({ engine, className }: { engine: EngineId; className?
     perplexity: { label: "P", className: "bg-blue-50 text-blue-700" },
     gemini: { label: "G", className: "bg-amber-50 text-amber-700" },
     deepseek: { label: "D", className: "bg-cyan-50 text-cyan-700" },
+    kimi: { label: "K", className: "bg-violet-50 text-violet-700" },
     doubao: { label: "豆", className: "bg-rose-50 text-rose-700" },
     yuanbao: { label: "元", className: "bg-teal-50 text-teal-700" },
   }

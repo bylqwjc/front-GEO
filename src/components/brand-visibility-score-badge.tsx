@@ -77,9 +77,9 @@ export function VisibilityScoreBadge({
           <button
             type="button"
             aria-label={`\u54c1\u724c\u53ef\u89c1\u5ea6 ${score} \u5206\uff0c${levelName}\uff0c\u67e5\u770b\u8bc4\u5206\u660e\u7ec6`}
-            className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-medium tabular-nums outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 ${scoreTone(score)}`}
+            className={`inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border px-2 py-0.5 text-xs font-medium whitespace-nowrap tabular-nums outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 ${scoreTone(score)}`}
           >
-            <BarChart3Icon className="size-3.5" aria-hidden="true" />
+            <BarChart3Icon className="size-3" aria-hidden="true" />
             <span>{score}/100</span>
             <span className="font-normal opacity-75">{levelName}</span>
           </button>
