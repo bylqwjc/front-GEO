@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { FormEvent, useMemo, useState } from "react"
+import { FormEvent, useEffect, useMemo, useState } from "react"
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, Globe2Icon, InfoIcon, PlusIcon, SparklesIcon, Trash2Icon } from "lucide-react"
 
 import { EngineMark, GeoPageHeader } from "@/components/geo-page"
@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { apiRequest } from "@/lib/api-client"
 import { useLanguage } from "@/lib/i18n"
 import type { EngineId } from "@/lib/types"
+import { getBilling } from "@/lib/project-api"
 
 const defaultPrompts = [
   "What are the best knowledge base tools for remote SaaS teams?",
@@ -48,7 +49,11 @@ export default function NewAuditPage() {
   const [prompts, setPrompts] = useState(defaultPrompts)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [creditCost, setCreditCost] = useState<number | null>(null)
+  const [balance, setBalance] = useState<number | null>(null)
   const responseCount = useMemo(() => prompts.filter(Boolean).length * selectedEngines.length * 2, [prompts, selectedEngines])
+
+  useEffect(() => { void getBilling().then(({ data }) => { setBalance(data.balance); setCreditCost(data.costs.find((item) => item.code === "CHECK")?.amount ?? null) }).catch(() => undefined) }, [])
 
   function toggleEngine(engine: EngineId) {
     setSelectedEngines((current) => current.includes(engine) ? current.filter((item) => item !== engine) : [...current, engine])
@@ -91,7 +96,7 @@ export default function NewAuditPage() {
           <Card id="prompts" className="scroll-mt-20 rounded-lg shadow-none"><CardHeader><CardTitle>{t("检测 Prompt")}</CardTitle><CardDescription>{t("按购买阶段整理的高意图客户问题")}</CardDescription><CardAction><Button variant="outline" size="sm" type="button"><SparklesIcon data-icon="inline-start" />{t("重新生成")}</Button></CardAction></CardHeader><CardContent className="grid gap-3"><div className="overflow-hidden rounded-lg border">{prompts.map((prompt, index) => <div key={index} className="grid grid-cols-[28px_1fr_32px] items-center gap-2 border-t p-2 first:border-t-0 hover:bg-muted/30"><span className="text-center text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span><Input aria-label={`Prompt ${index + 1}`} value={prompt} onChange={(event) => setPrompts((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} /><Button variant="ghost" size="icon" type="button" aria-label={`${t("删除")} Prompt ${index + 1}`} onClick={() => setPrompts((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2Icon /></Button></div>)}</div><Button variant="ghost" size="sm" type="button" className="w-fit" onClick={() => setPrompts((current) => [...current, ""])}><PlusIcon data-icon="inline-start" />{t("添加 Prompt")}</Button></CardContent></Card>
         </div>
 
-        <Card className="sticky top-16 rounded-lg shadow-none"><CardHeader><CardTitle>{t("检测摘要")}</CardTitle><CardDescription>{t("创建后将进入异步检测队列")}</CardDescription></CardHeader><CardContent className="grid gap-4"><div className="flex min-w-0 items-center gap-3 rounded-lg border bg-muted/30 p-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground text-xs font-semibold text-background">A</span><div className="min-w-0"><p className="truncate text-sm font-medium">{brand || t("未命名品牌")}</p><p className="truncate text-xs text-muted-foreground">{domain || t("尚未填写域名")}</p></div></div><dl className="grid text-sm"><div className="flex justify-between border-b py-2.5"><dt className="text-muted-foreground">{t("检测 Prompt")}</dt><dd className="font-medium">{prompts.filter(Boolean).length}</dd></div><div className="flex justify-between border-b py-2.5"><dt className="text-muted-foreground">{t("AI 搜索引擎")}</dt><dd className="font-medium">{selectedEngines.length}</dd></div><div className="flex justify-between border-b py-2.5"><dt className="text-muted-foreground">{t("每题重复次数")}</dt><dd className="font-medium">2</dd></div><div className="flex justify-between py-2.5"><dt className="text-muted-foreground">{t("预计生成回答")}</dt><dd className="text-lg font-semibold text-emerald-700">{responseCount}</dd></div></dl><div className="flex gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900"><InfoIcon className="mt-0.5 size-4 shrink-0" /><p className="text-xs">{t("自动采集和人工采集会进入同一检测批次，报告将明确标注采集方式。")}</p></div>{error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p> : null}<Button type="submit" size="lg" disabled={submitting || responseCount === 0} className="w-full">{submitting ? t("正在创建...") : t("开始检测")}{!submitting ? <ArrowRightIcon data-icon="inline-end" /> : null}</Button></CardContent></Card>
+        <Card className="sticky top-16 rounded-lg shadow-none"><CardHeader><CardTitle>{t("检测摘要")}</CardTitle><CardDescription>{t("创建后将进入异步检测队列")}</CardDescription></CardHeader><CardContent className="grid gap-4"><div className="flex min-w-0 items-center gap-3 rounded-lg border bg-muted/30 p-3"><span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-foreground text-xs font-semibold text-background">A</span><div className="min-w-0"><p className="truncate text-sm font-medium">{brand || t("未命名品牌")}</p><p className="truncate text-xs text-muted-foreground">{domain || t("尚未填写域名")}</p></div></div><dl className="grid text-sm"><div className="flex justify-between border-b py-2.5"><dt className="text-muted-foreground">{t("检测 Prompt")}</dt><dd className="font-medium">{prompts.filter(Boolean).length}</dd></div><div className="flex justify-between border-b py-2.5"><dt className="text-muted-foreground">{t("AI 搜索引擎")}</dt><dd className="font-medium">{selectedEngines.length}</dd></div><div className="flex justify-between border-b py-2.5"><dt className="text-muted-foreground">{t("每题重复次数")}</dt><dd className="font-medium">2</dd></div><div className="flex justify-between py-2.5"><dt className="text-muted-foreground">{t("预计生成回答")}</dt><dd className="text-lg font-semibold text-emerald-700">{responseCount}</dd></div></dl><div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><div className="flex justify-between"><span>本次检查消耗</span><strong>{creditCost === null ? "加载中" : `${creditCost} 积分`}</strong></div>{balance !== null ? <div className="mt-1 text-amber-800">当前余额：{balance} 积分</div> : null}</div><div className="flex gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-900"><InfoIcon className="mt-0.5 size-4 shrink-0" /><p className="text-xs">{t("自动采集和人工采集会进入同一检测批次，报告将明确标注采集方式。")}</p></div>{error ? <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p> : null}<Button type="submit" size="lg" disabled={submitting || responseCount === 0} className="w-full">{submitting ? t("正在创建...") : t("开始检测")}{!submitting ? <ArrowRightIcon data-icon="inline-end" /> : null}</Button></CardContent></Card>
       </div>
     </form>
   )

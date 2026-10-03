@@ -47,6 +47,7 @@ import {
   type ManualAuditTask,
   type Project,
 } from "@/lib/project-api"
+import { getBilling } from "@/lib/project-api"
 
 const ui = {
   failed: '监测失败',
@@ -203,6 +204,8 @@ function AnalysisBadges({
 
 export function ProjectAudits({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<Project | null>(null)
+  const [checkCost, setCheckCost] = useState<number | null>(null)
+  const [retestCost, setRetestCost] = useState<number | null>(null)
   const [audits, setAudits] = useState<ManualAudit[]>([])
   const [selectedAuditId, setSelectedAuditId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
@@ -222,6 +225,7 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
   const [automaticConfirmationOpen, setAutomaticConfirmationOpen] =
     useState(false)
   const [error, setError] = useState("")
+  useEffect(() => { void getBilling().then(({ data }) => { setCheckCost(data.costs.find((item) => item.code === "CHECK")?.amount ?? null); setRetestCost(data.costs.find((item) => item.code === "RETEST")?.amount ?? null) }).catch(() => undefined) }, [])
 
   const load = useCallback(
     async (preferredAuditId?: string, auditsOnly = false) => {
@@ -757,6 +761,11 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
             ) : null}
           </div>
 
+          <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
+            <span className="rounded-md border bg-muted/30 px-2 py-1">本轮检查：{checkCost === null ? "—" : `${checkCost} 积分`}</span>
+            <span className="rounded-md border bg-muted/30 px-2 py-1">复查：{retestCost === null ? "—" : `${retestCost} 积分`}</span>
+          </div>
+
           {automaticPlatformId ? (
             <div className="flex justify-end">
               <Button
@@ -1149,4 +1158,3 @@ export function ProjectAudits({ projectId }: { projectId: string }) {
     </div>
   )
 }
-

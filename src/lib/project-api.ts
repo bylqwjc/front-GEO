@@ -164,6 +164,12 @@ const billingSchema = z.object({
     reason: z.string().nullable(),
     createdAt: z.string(),
   })),
+  costs: z.array(z.object({
+    code: z.string(),
+    name: z.string(),
+    amount: z.number(),
+    description: z.string().nullable(),
+  })),
 })
 
 export type Project = z.infer<typeof projectSchema>
